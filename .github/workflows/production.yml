@@ -7,7 +7,7 @@ on:
   pull_request:
     branches:
       - main
-      - get-repo-basic-working
+      - develop
 
 jobs:
   test:
