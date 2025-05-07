@@ -69,6 +69,7 @@ class UserService:
             if new_user.role == UserRole.ADMIN:
                 new_user.email_verified = True
 
+            # Generate a verification token
             new_user.verification_token = generate_verification_token()
 
             session.add(new_user)
