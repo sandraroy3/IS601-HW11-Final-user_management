@@ -17,7 +17,8 @@ Key Highlights:
 - Implements HATEOAS by generating dynamic links for user-related actions, enhancing API discoverability.
 - Utilizes OAuth2PasswordBearer for securing API endpoints, requiring valid access tokens for operations.
 """
-
+import io
+import logging
 from builtins import dict, int, len, str
 from datetime import timedelta
 from uuid import UUID
@@ -27,15 +28,27 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.dependencies import get_current_user, get_db, get_email_service, require_role
 from app.schemas.pagination_schema import EnhancedPagination
 from app.schemas.token_schema import TokenResponse
-from app.schemas.user_schemas import LoginRequest, UserBase, UserCreate, UserListResponse, UserResponse, UserUpdate
+from app.schemas.user_schemas import LoginRequest, UploadProfilePictureResponse, UserBase, UserCreate, UserListResponse, UserResponse, UserUpdate
 from app.services.user_service import UserService
 from app.services.jwt_service import create_access_token
 from app.utils.link_generation import create_user_links, generate_pagination_links
 from app.dependencies import get_settings
 from app.services.email_service import EmailService
+from fastapi import File, UploadFile
+from app.services.minio_service import upload_profile_picture_to_minio
+from app.services.user_service import update_profile_picture
+# from minio import Minio
+
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
-settings = get_settings()
+from app.services.minio_service import minio_client
+from settings.config import settings
+
+bucket_name = settings.minio_bucket_name
+if not minio_client.bucket_exists(bucket_name):
+    minio_client.make_bucket(bucket_name)
+
+
 @router.get("/users/{user_id}", response_model=UserResponse, name="get_user", tags=["User Management Requires (Admin or Manager Roles)"])
 async def get_user(user_id: UUID, request: Request, db: AsyncSession = Depends(get_db), token: str = Depends(oauth2_scheme), current_user: dict = Depends(require_role(["ADMIN", "MANAGER"]))):
     """
@@ -245,3 +258,66 @@ async def verify_email(user_id: UUID, token: str, db: AsyncSession = Depends(get
     if await UserService.verify_email_with_token(db, user_id, token):
         return {"message": "Email verified successfully"}
     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired verification token")
+
+from app.models.user_model import User
+from app.schemas.user_schemas import UserResponse
+
+@router.post("/users/{user_id}/upload-profile-picture", response_model=UserResponse, name="upload_profile_picture", tags=["User Management Requires (Admin or Manager Roles)"])
+async def upload_profile_picture_to_minio(file: UploadFile, user_id: UUID, db: AsyncSession = Depends(get_db)) -> UserResponse:
+    
+    bucket_name = get_settings().minio_bucket_name
+    object_name = f"{user_id}/{file.filename}"
+    content_type = file.content_type
+
+    try:
+        found = minio_client.bucket_exists(bucket_name)
+        if not found:
+            minio_client.make_bucket(bucket_name)
+    except (BucketAlreadyExists, BucketAlreadyOwnedByYou):
+        pass
+
+    minio_client.put_object(
+        bucket_name,
+        object_name,
+        file.file,
+        length=-1,
+        part_size=10 * 1024 * 1024,
+        content_type=content_type
+    )
+
+    # Update user with new picture URL in DB
+    updated_user = await update_profile_picture(db, user_id, picture_url=f"https://{get_settings().minio_endpoint}/{bucket_name}/{object_name}")
+
+    # If updated_user is an ORM model, convert it to Pydantic model (UserResponse)
+    return UserResponse.from_orm(updated_user)
+
+
+# @router.post("/users/{user_id}/upload-profile-picture", response_model=UserResponse, name="upload_profile_picture", tags=["User Management Requires (Admin or Manager Roles)"])
+# async def upload_profile_picture_to_minio(file: UploadFile, user_id: UUID, db: AsyncSession = Depends(get_db)) -> str:
+#     bucket_name = get_settings().minio_bucket_name
+#     object_name = f"{user_id}/{file.filename}"
+#     content_type = file.content_type
+
+#     try:
+#         found = minio_client.bucket_exists(bucket_name)
+#         if not found:
+#             minio_client.make_bucket(bucket_name)
+#     except (BucketAlreadyExists, BucketAlreadyOwnedByYou):
+#         pass
+
+#     minio_client.put_object(
+#         bucket_name,
+#         object_name,
+#         file.file,
+#         length=-1,
+#         part_size=10 * 1024 * 1024,
+#         content_type=content_type
+#     )
+
+#     updated_user = await update_profile_picture(db, user_id, picture_url=f"{get_settings().minio_endpoint}/{bucket_name}/{object_name}")  # however you persist changes
+#     return UserResponse(**updated_user.dict())
+# # Example assuming you updated user in DB
+#     # updated_user = await user_service.get_user(user_id)
+#     # return UserResponse.model_validate(updated_user)
+
+#     # return f"{get_settings().minio_endpoint}/{bucket_name}/{object_name}"
