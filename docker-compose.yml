@@ -37,12 +37,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      minio:
-        condition: service_healthy
     networks:
       - app-network
-    environment:
-      - MINIO_ENDPOINT=http://minio:9000
 
   nginx:
     image: nginx:latest
@@ -55,30 +51,22 @@ services:
     networks:
       - app-network
 
-  minio:
+  minio:  
     image: minio/minio:latest
+    command: minio server --console-address ":9001" /data
     ports:
       - "9000:9000"     # Web interface/API
       - "9001:9001"     # Admin Console
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
-    command: server /data --console-address ":9001"
-    # healthcheck:
-    #   test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-    #   interval: 10s
-    #   timeout: 5s
-    #   retries: 5
     volumes:
       - minio-data:/data
     networks:
       - app-network
-
 volumes:
   postgres-data:
   pgadmin-data:
   minio-data:
-
 networks:
   app-network:
-    driver: bridge
