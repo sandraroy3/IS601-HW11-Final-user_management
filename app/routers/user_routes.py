@@ -17,7 +17,6 @@ Key Highlights:
 - Implements HATEOAS by generating dynamic links for user-related actions, enhancing API discoverability.
 - Utilizes OAuth2PasswordBearer for securing API endpoints, requiring valid access tokens for operations.
 """
-import asyncio
 import io
 import logging
 from datetime import timedelta
@@ -35,8 +34,7 @@ from app.utils.link_generation import create_user_links, generate_pagination_lin
 from app.dependencies import get_settings
 from app.services.email_service import EmailService
 from fastapi import File, UploadFile
-from app.services.minio_service import upload_profile_picture_to_minio
-from app.services.user_service import UserService
+from app.services.user_service import update_profile_picture
 # from minio import Minio
 
 router = APIRouter()
@@ -49,11 +47,6 @@ if not minio_client.bucket_exists(bucket_name):
     minio_client.make_bucket(bucket_name)
 
 
-@router.on_event("startup")
-async def startup_check_bucket():
-    found = await asyncio.to_thread(minio_client.bucket_exists, bucket_name)
-    if not found:
-        await asyncio.to_thread(minio_client.make_bucket, bucket_name)
 @router.get("/users/{user_id}", response_model=UserResponse, name="get_user", tags=["User Management Requires (Admin or Manager Roles)"])
 async def get_user(user_id: UUID, request: Request, db: AsyncSession = Depends(get_db), token: str = Depends(oauth2_scheme), current_user: dict = Depends(require_role(["ADMIN", "MANAGER"]))):
     """
@@ -249,25 +242,22 @@ async def verify_email(user_id: UUID, token: str, db: AsyncSession = Depends(get
 from app.models.user_model import User
 from app.schemas.user_schemas import UserResponse
 
-@router.post("/users/{user_id}/upload-profile-picture", response_model=UserResponse, name="upload_profile_picture", tags=["Upload Images (Admin or Manager or Authenticated Roles)"])
-async def upload_profile_picture_to_minio(
-    file: UploadFile,
-    user_id: UUID,
-    db: AsyncSession = Depends(get_db),
-    settings=Depends(get_settings)
-) -> UserResponse:
-    """
-    Upload a profile picture for a user to MinIO and update the user's profile with the new picture URL.
-
-    - **user_id**: UUID of the user whose profile picture is being uploaded.
-    - **file**: UploadFile object containing the picture to upload.
-    """
+@router.post("/users/{user_id}/upload-profile-picture", response_model=UserResponse, name="upload_profile_picture", tags=["User Management Requires (Admin or Manager Roles)"])
+async def upload_profile_picture_to_minio(file: UploadFile, user_id: UUID, db: AsyncSession = Depends(get_db)) -> UserResponse:
+    
+    bucket_name = get_settings().minio_bucket_name
     object_name = f"{user_id}/{file.filename}"
     content_type = file.content_type
 
-    await asyncio.to_thread(
-        minio_client.put_object,
-        settings.minio_bucket_name,
+    # try:
+    #     found = minio_client.bucket_exists(bucket_name)
+    #     if not found:
+    #         minio_client.make_bucket(bucket_name)
+    # except (BucketAlreadyExists, BucketAlreadyOwnedByYou):
+    #     pass
+
+    minio_client.put_object(
+        bucket_name,
         object_name,
         file.file,
         length=-1,
@@ -275,11 +265,8 @@ async def upload_profile_picture_to_minio(
         content_type=content_type
     )
 
-    picture_url = f"https://{settings.minio_endpoint}/{settings.minio_bucket_name}/{object_name}"
+    # Update user with new picture URL in DB
+    updated_user = await update_profile_picture(db, user_id, picture_url=f"https://{get_settings().minio_endpoint}/{bucket_name}/{object_name}")
 
-    updated_user = await UserService.update_profile_picture(db, user_id, picture_url=picture_url)
-
-    if not updated_user:
-        raise HTTPException(status_code=404, detail="User not found")
-
+    # If updated_user is an ORM model, convert it to Pydantic model (UserResponse)
     return UserResponse.from_orm(updated_user)

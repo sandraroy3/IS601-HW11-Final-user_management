@@ -16,13 +16,13 @@ MINIO_BUCKET_NAME = "profile-pictures"
 BASE_URL = f"http://{os.getenv('MINIO_ENDPOINT', 'localhost:9000')}/{MINIO_BUCKET_NAME}"
 
 async def upload_profile_picture_to_minio(file: UploadFile, user_id: UUID) -> str:
-    if not minio_client.bucket_exists(MINIO_BUCKET_NAME):
-        minio_client.make_bucket(MINIO_BUCKET_NAME)
+    if not MINIO_CLIENT.bucket_exists(MINIO_BUCKET_NAME):
+        MINIO_CLIENT.make_bucket(MINIO_BUCKET_NAME)
 
     object_name = f"{user_id}/{file.filename}"
     content = await file.read()
 
-    minio_client.put_object(
+    MINIO_CLIENT.put_object(
         MINIO_BUCKET_NAME,
         object_name,
         io.BytesIO(content),
