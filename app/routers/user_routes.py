@@ -269,12 +269,12 @@ async def upload_profile_picture_to_minio(file: UploadFile, user_id: UUID, db: A
     object_name = f"{user_id}/{file.filename}"
     content_type = file.content_type
 
-    try:
-        found = minio_client.bucket_exists(bucket_name)
-        if not found:
-            minio_client.make_bucket(bucket_name)
-    except (BucketAlreadyExists, BucketAlreadyOwnedByYou):
-        pass
+    # try:
+    #     found = minio_client.bucket_exists(bucket_name)
+    #     if not found:
+    #         minio_client.make_bucket(bucket_name)
+    # except (BucketAlreadyExists, BucketAlreadyOwnedByYou):
+    #     pass
 
     minio_client.put_object(
         bucket_name,
