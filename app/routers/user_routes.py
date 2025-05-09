@@ -42,9 +42,15 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 from app.services.minio_service import minio_client
 from settings.config import settings
 
-bucket_name = settings.minio_bucket_name
-if not minio_client.bucket_exists(bucket_name):
-    minio_client.make_bucket(bucket_name)
+def ensure_bucket_exists():
+    bucket_name = get_settings().minio_bucket_name
+    if not minio_client.bucket_exists(bucket_name):
+        minio_client.make_bucket(bucket_name)
+
+
+@router.on_event("startup")
+async def startup_event():
+    ensure_bucket_exists()
 
 
 @router.get("/users/{user_id}", response_model=UserResponse, name="get_user", tags=["User Management Requires (Admin or Manager Roles)"])
@@ -188,7 +194,7 @@ async def list_users(
     users = await UserService.list_users(db, skip, limit)
 
     user_responses = [
-        UserResponse.model_validate(user) for user in users
+        UserResponse.construct(user) for user in users
     ]
     
     pagination_links = generate_pagination_links(request, skip, limit, total_users)
@@ -240,7 +246,6 @@ async def verify_email(user_id: UUID, token: str, db: AsyncSession = Depends(get
     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired verification token")
 
 from app.models.user_model import User
-from app.schemas.user_schemas import UserResponse
 
 @router.post("/users/{user_id}/upload-profile-picture", response_model=UserResponse, name="upload_profile_picture", tags=["User Management Requires (Admin or Manager Roles)"])
 async def upload_profile_picture_to_minio(file: UploadFile, user_id: UUID, db: AsyncSession = Depends(get_db)) -> UserResponse:
