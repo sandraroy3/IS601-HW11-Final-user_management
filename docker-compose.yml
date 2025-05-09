@@ -24,7 +24,7 @@ services:
     depends_on:
       - postgres
     ports:
-      - "5050:80" # Expose PgAdmin on port 5050 of the host
+      - "5050:80"
     volumes:
       - pgadmin-data:/var/lib/pgadmin
     networks:
@@ -36,6 +36,8 @@ services:
       - ./:/myapp/
     depends_on:
       postgres:
+        condition: service_healthy
+      minio:
         condition: service_healthy
     networks:
       - app-network
@@ -55,18 +57,25 @@ services:
     image: minio/minio:latest
     command: minio server --console-address ":9001" /data
     ports:
-      - "9000:9000"     # Web interface/API
-      - "9001:9001"     # Admin Console
+      - "9000:9000"
+      - "9001:9001"
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
     volumes:
       - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - app-network
+
 volumes:
   postgres-data:
   pgadmin-data:
   minio-data:
+
 networks:
   app-network:
