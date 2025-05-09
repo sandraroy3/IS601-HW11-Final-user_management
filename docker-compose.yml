@@ -47,7 +47,7 @@ services:
     ports:
       - "80:80"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf  # <-- must replace main config, not conf.d
     depends_on:
       - fastapi
     networks:
