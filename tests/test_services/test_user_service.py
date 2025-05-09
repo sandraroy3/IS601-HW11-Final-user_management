@@ -161,3 +161,13 @@ async def test_unlock_user_account(db_session, locked_user):
     assert unlocked, "The account should be unlocked"
     refreshed_user = await UserService.get_by_id(db_session, locked_user.id)
     assert not refreshed_user.is_locked, "The user should no longer be locked"
+
+from unittest.mock import MagicMock, patch
+from app.services.minio_service import minio_client
+
+@pytest.fixture(autouse=True)
+def mock_minio_client():
+    with patch("app.routers.user_routes.minio_client") as mock_client:
+        mock_client.bucket_exists.return_value = True
+        mock_client.put_object.return_value = None
+        yield mock_client

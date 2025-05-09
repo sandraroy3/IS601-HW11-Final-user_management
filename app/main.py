@@ -6,6 +6,8 @@ from app.database import Database
 from app.dependencies import get_settings
 from app.routers import user_routes
 from app.utils.api_description import getDescription
+from app.services.minio_service import minio_client
+
 app = FastAPI(
     title="User Management",
     description=getDescription(),
@@ -32,6 +34,11 @@ app.add_middleware(
 async def startup_event():
     settings = get_settings()
     Database.initialize(settings.database_url, settings.debug)
+
+@app.on_event("startup")
+async def check_minio():
+    if not minio_client.bucket_exists("profile-pictures"):
+        minio_client.make_bucket("profile-pictures")
 
 @app.exception_handler(Exception)
 async def exception_handler(request, exc):
