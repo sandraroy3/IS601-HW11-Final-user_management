@@ -223,21 +223,62 @@ async def verify_email(user_id: UUID, token: str, db: AsyncSession = Depends(get
         return {"message": "Email verified successfully"}
     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired verification token")
 
-@router.post("/users/{user_id}/upload-profile-picture", response_model=UserResponse, name="upload_profile_picture", tags=["User Management Requires (Admin or Manager Roles)"])
-async def upload_profile_picture_to_minio(file: UploadFile, user_id: UUID, db: AsyncSession = Depends(get_db)) -> UserResponse:
+from fastapi import UploadFile, HTTPException
+from uuid import UUID
+from PIL import Image
+import io
+
+ALLOWED_FORMATS = {"image/jpeg", "image/png", "image/webp"}
+MAX_FILE_SIZE_MB = 5
+RESIZE_DIMENSIONS = (300, 300)
+
+@router.post(
+    "/users/{user_id}/upload-profile-picture",
+    response_model=UserResponse,
+    name="upload_profile_picture",
+    tags=["User Management Requires (Admin or Manager Roles or Authenticated User)"]
+)
+async def upload_profile_picture_to_minio(
+    file: UploadFile,
+    user_id: UUID,
+    db: AsyncSession = Depends(get_db)
+) -> UserResponse:
+    # 1. Validate format
+    if file.content_type not in ALLOWED_FORMATS:
+        raise HTTPException(status_code=400, detail="Unsupported file type.")
+
+    # 2. Read and validate size
+    contents = await file.read()
+    if len(contents) > MAX_FILE_SIZE_MB * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File size exceeds 5MB limit.")
+
+    # 3. Resize and optimize image
+    try:
+        image = Image.open(io.BytesIO(contents))
+        image = image.convert("RGB")  # ensures compatibility
+        image = image.resize(RESIZE_DIMENSIONS)
+
+        optimized_io = io.BytesIO()
+        image.save(optimized_io, format="JPEG", optimize=True, quality=85)
+        optimized_io.seek(0)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid image data.")
+
+    # 4. Upload to MinIO
     bucket_name = get_settings().minio_bucket_name
-    object_name = f"{user_id}/{file.filename}"
-    content_type = file.content_type
+    object_name = f"{user_id}/profile.jpg"  # enforce consistent naming
+    content_type = "image/jpeg"
 
     minio_client.put_object(
         bucket_name,
         object_name,
-        file.file,
-        length=-1,
-        part_size=10 * 1024 * 1024,
+        optimized_io,
+        length=optimized_io.getbuffer().nbytes,
         content_type=content_type
     )
 
-    updated_user = await update_profile_picture(db, user_id, picture_url=f"https://{get_settings().minio_endpoint}/{bucket_name}/{object_name}")
-    
+    # 5. Update DB
+    profile_url = f"https://{get_settings().minio_endpoint}/{bucket_name}/{object_name}"
+    updated_user = await update_profile_picture(db, user_id, picture_url=profile_url)
+
     return UserResponse.from_orm(updated_user)

@@ -34,6 +34,7 @@ MarkupSafe==2.1.5
 minio
 packaging==24.0
 passlib==1.7.4
+pillow
 pluggy==1.4.0
 psycopg==3.1.18
 psycopg2-binary==2.9.9
