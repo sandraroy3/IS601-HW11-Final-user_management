@@ -238,3 +238,20 @@ def email_service():
         mock_service.send_verification_email.return_value = None
         mock_service.send_user_email.return_value = None
         return mock_service
+
+from unittest.mock import MagicMock, patch
+
+@pytest.fixture(autouse=True)
+def mock_minio_client():
+    with patch("app.routers.user_routes.minio_client") as mock_client:
+        mock_client.bucket_exists.return_value = True
+        mock_client.put_object.return_value = None
+        yield mock_client
+import pytest
+from unittest.mock import MagicMock, patch
+
+@pytest.fixture(scope="session", autouse=True)
+def mock_minio():
+    with patch("app.routers.user_routes.minio_client") as mock_client:
+        mock_client.bucket_exists.return_value = True
+        yield mock_client
