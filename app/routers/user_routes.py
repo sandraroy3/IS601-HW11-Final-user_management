@@ -204,7 +204,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Async
         access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
 
         access_token = create_access_token(
-            data={"sub": user.email, "role": str(user.role.name)},
+            data={"sub": str(user.id),"role": str(user.role.name)},
             expires_delta=access_token_expires
         )
 
@@ -223,14 +223,20 @@ async def verify_email(user_id: UUID, token: str, db: AsyncSession = Depends(get
         return {"message": "Email verified successfully"}
     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired verification token")
 
-from fastapi import UploadFile, HTTPException
+from fastapi import UploadFile, HTTPException, Depends, status
 from uuid import UUID
 from PIL import Image
 import io
+import logging
+
+from app.models import user_model
+from app.dependencies import get_current_user  # adjust path as needed
 
 ALLOWED_FORMATS = {"image/jpeg", "image/png", "image/webp"}
 MAX_FILE_SIZE_MB = 5
 RESIZE_DIMENSIONS = (300, 300)
+logger = logging.getLogger(__name__)
+
 
 @router.post(
     "/users/{user_id}/upload-profile-picture",
@@ -241,21 +247,34 @@ RESIZE_DIMENSIONS = (300, 300)
 async def upload_profile_picture_to_minio(
     file: UploadFile,
     user_id: UUID,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
 ) -> UserResponse:
-    # 1. Validate format
+    # 🔒 Authorization
+    current_user_id = UUID(current_user["user_id"])  # convert from str to UUID
+    current_user_role = current_user["role"]
+
+    if current_user_role == "AUTHENTICATED" and current_user_id != user_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Authenticated users can only upload their own profile picture."
+        )
+    elif current_user_role not in {"ADMIN", "MANAGER", "AUTHENTICATED"}:
+        raise HTTPException(status_code=403, detail="You are not authorized to upload profile pictures.")
+
+    # ✅ Validate file type
     if file.content_type not in ALLOWED_FORMATS:
         raise HTTPException(status_code=400, detail="Unsupported file type.")
 
-    # 2. Read and validate size
+    # ✅ Validate file size
     contents = await file.read()
     if len(contents) > MAX_FILE_SIZE_MB * 1024 * 1024:
         raise HTTPException(status_code=400, detail="File size exceeds 5MB limit.")
 
-    # 3. Resize and optimize image
+    # ✅ Resize and optimize image
     try:
         image = Image.open(io.BytesIO(contents))
-        image = image.convert("RGB")  # ensures compatibility
+        image = image.convert("RGB")
         image = image.resize(RESIZE_DIMENSIONS)
 
         optimized_io = io.BytesIO()
@@ -264,20 +283,20 @@ async def upload_profile_picture_to_minio(
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid image data.")
 
-    # 4. Upload to MinIO
+    # ✅ Upload to MinIO
     bucket_name = get_settings().minio_bucket_name
-    object_name = f"{user_id}/profile.jpg"  # enforce consistent naming
+    object_name = f"{user_id}/{file.filename}"
     content_type = "image/jpeg"
 
     minio_client.put_object(
-        bucket_name,
-        object_name,
-        optimized_io,
+        bucket_name=bucket_name,
+        object_name=object_name,
+        data=optimized_io,
         length=optimized_io.getbuffer().nbytes,
-        content_type=content_type
+        content_type=content_type,
     )
 
-    # 5. Update DB
+    # ✅ Update user profile picture in DB
     profile_url = f"https://{get_settings().minio_endpoint}/{bucket_name}/{object_name}"
     updated_user = await update_profile_picture(db, user_id, picture_url=profile_url)
 
