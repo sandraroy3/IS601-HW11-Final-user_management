@@ -290,34 +290,3 @@ async def upload_profile_picture_to_minio(file: UploadFile, user_id: UUID, db: A
 
     # If updated_user is an ORM model, convert it to Pydantic model (UserResponse)
     return UserResponse.from_orm(updated_user)
-
-
-# @router.post("/users/{user_id}/upload-profile-picture", response_model=UserResponse, name="upload_profile_picture", tags=["User Management Requires (Admin or Manager Roles)"])
-# async def upload_profile_picture_to_minio(file: UploadFile, user_id: UUID, db: AsyncSession = Depends(get_db)) -> str:
-#     bucket_name = get_settings().minio_bucket_name
-#     object_name = f"{user_id}/{file.filename}"
-#     content_type = file.content_type
-
-#     try:
-#         found = minio_client.bucket_exists(bucket_name)
-#         if not found:
-#             minio_client.make_bucket(bucket_name)
-#     except (BucketAlreadyExists, BucketAlreadyOwnedByYou):
-#         pass
-
-#     minio_client.put_object(
-#         bucket_name,
-#         object_name,
-#         file.file,
-#         length=-1,
-#         part_size=10 * 1024 * 1024,
-#         content_type=content_type
-#     )
-
-#     updated_user = await update_profile_picture(db, user_id, picture_url=f"{get_settings().minio_endpoint}/{bucket_name}/{object_name}")  # however you persist changes
-#     return UserResponse(**updated_user.dict())
-# # Example assuming you updated user in DB
-#     # updated_user = await user_service.get_user(user_id)
-#     # return UserResponse.model_validate(updated_user)
-
-#     # return f"{get_settings().minio_endpoint}/{bucket_name}/{object_name}"
