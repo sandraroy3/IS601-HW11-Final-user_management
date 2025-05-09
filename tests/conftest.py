@@ -16,7 +16,7 @@ Fixtures:
 # Standard library imports
 from builtins import Exception, range, str
 from datetime import timedelta
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, patch, MagicMock
 from uuid import uuid4
 
 # Third-party imports
@@ -45,6 +45,37 @@ engine = create_async_engine(TEST_DATABASE_URL, echo=settings.debug)
 AsyncTestingSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 AsyncSessionScoped = scoped_session(AsyncTestingSessionLocal)
 
+@pytest.fixture()
+async def async_client():
+    async with AsyncClient(app=app, base_url="http://test") as ac:
+        yield ac
+
+@pytest.fixture
+async def admin_token():
+    # Replace with actual logic to generate a valid admin JWT token
+    return "valid_admin_token_here"  # For testing purposes, replace with real logic.
+
+@pytest.fixture
+async def user_token():
+    # Replace with actual logic to generate a valid user JWT token
+    return "valid_user_token_here"  # For testing purposes, replace with real logic.
+
+@pytest.fixture
+async def verified_user(db_session):
+    user = User(
+        email="test@example.com",
+        password=hash_password("Password123!"),  # Ensure the password is hashed
+        role=UserRole.USER,
+        is_verified=True
+    )
+    db_session.add(user)
+    db_session.commit()
+    return user
+
+@pytest.fixture
+def email_service(mocker):
+    mock_email_service = mocker.patch("app.services.email_service.send_email")
+    return mock_email_service
 
 @pytest.fixture
 def email_service():
@@ -238,3 +269,13 @@ def email_service():
         mock_service.send_verification_email.return_value = None
         mock_service.send_user_email.return_value = None
         return mock_service
+    
+# Automatically patch minio_client when tests run
+@pytest.fixture(autouse=True, scope="session")
+def mock_minio_client():
+    with patch("app.routers.user_routes.minio_client") as mock_client:
+        mock_client.bucket_exists.return_value = True
+        mock_client.make_bucket.return_value = None
+        mock_client.put_object.return_value = None
+        mock_client.get_object.return_value = MagicMock()
+        yield mock_client

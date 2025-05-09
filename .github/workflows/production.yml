@@ -4,10 +4,10 @@ on:
   push:
     branches:
       - main
+      - develop
   pull_request:
     branches:
       - main
-      - get-repo-basic-working
 
 jobs:
   test:

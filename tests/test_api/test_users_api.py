@@ -7,6 +7,19 @@ from app.utils.nickname_gen import generate_nickname
 from app.utils.security import hash_password
 from app.services.jwt_service import decode_token  # Import your FastAPI app
 
+# @pytest.fixture()
+# async def async_client():
+#     async with AsyncClient(app=app, base_url="http://test") as ac:
+#         yield ac
+
+# @pytest.fixture
+# async def admin_token():
+#     return "valid_admin_token_here"  # Replace with actual JWT generation logic
+
+# @pytest.fixture
+# async def user_token():
+#     return "valid_user_token_here"  # Replace with actual JWT generation logic
+
 # Example of a test function using the async_client fixture
 @pytest.mark.asyncio
 async def test_create_user_access_denied(async_client, user_token, email_service):

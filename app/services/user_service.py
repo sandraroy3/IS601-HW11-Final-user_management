@@ -1,3 +1,4 @@
+
 from builtins import Exception, bool, classmethod, int, str
 from datetime import datetime, timezone
 import secrets
@@ -69,12 +70,12 @@ class UserService:
             if new_user.role == UserRole.ADMIN:
                 new_user.email_verified = True
 
-            else:
-                new_user.verification_token = generate_verification_token()
-                await email_service.send_verification_email(new_user)
+            new_user.verification_token = generate_verification_token()
 
             session.add(new_user)
             await session.commit()
+            await email_service.send_verification_email(new_user)
+
             return new_user
         except ValidationError as e:
             logger.error(f"Validation error during user creation: {e}")
@@ -170,7 +171,9 @@ class UserService:
         if user and user.verification_token == token:
             user.email_verified = True
             user.verification_token = None  # Clear the token once used
-            user.role = UserRole.AUTHENTICATED
+            # Update the user's role to AUTHENTICATED if it was ANONYMOUS
+            if user.role == UserRole.ANONYMOUS: 
+              user.role = UserRole.AUTHENTICATED            
             session.add(user)
             await session.commit()
             return True
@@ -199,3 +202,13 @@ class UserService:
             await session.commit()
             return True
         return False
+
+@staticmethod
+async def update_profile_picture(db: AsyncSession, user_id: UUID, picture_url: str):
+    user = await UserService.get_by_id(db, user_id)
+    if not user:
+        return None
+    user.profile_picture_url = picture_url
+    await db.commit()
+    await db.refresh(user)
+    return user

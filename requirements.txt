@@ -1,3 +1,4 @@
+
 aiofiles==23.2.1
 aiomysql==0.2.0
 alembic==1.13.1
@@ -19,18 +20,21 @@ email_validator==2.1.1
 exceptiongroup==1.2.0
 factory-boy==3.3.0
 Faker==24.4.0
-fastapi==0.110.0
+fastapi==0.115.12
 greenlet==3.0.3
 gunicorn==23.0.0
-h11>=0.13.0,<0.15
-httpcore==1.0.5
+h11==0.16.0
+# h11>=0.13.0,<0.16
+httpcore==1.0.9
 httpx==0.27.0
 idna==3.6
 iniconfig==2.0.0
 Mako==1.3.2
 MarkupSafe==2.1.5
+minio
 packaging==24.0
 passlib==1.7.4
+pillow
 pluggy==1.4.0
 psycopg==3.1.18
 psycopg2-binary==2.9.9
@@ -48,13 +52,14 @@ pytest-mock==3.14.0
 python-dateutil==2.9.0.post0
 python-dotenv==1.0.1
 python-jose==3.4.0
-python-multipart==0.0.10
+python-multipart==0.0.18
 qrcode==7.4.2
 rsa==4.9
 six==1.16.0
 sniffio==1.3.1
 SQLAlchemy==2.0.29
-starlette>=0.36.3,<0.37.0
+starlette==0.40.0
+# starlette>=0.37.2,<0.40.0
 tomli==2.0.1
 typing_extensions==4.10.0
 uvicorn==0.29.0
