@@ -5,6 +5,10 @@ from app.dependencies import get_settings
 from app.models.user_model import User, UserRole
 from app.services.user_service import UserService
 from app.utils.nickname_gen import generate_nickname
+from unittest.mock import AsyncMock, MagicMock
+from uuid import uuid4
+from app.services.user_service import UserService
+from app.models.user_model import User
 
 pytestmark = pytest.mark.asyncio
 
@@ -135,7 +139,7 @@ async def test_login_user_incorrect_password(db_session, user):
 # Test account lock after maximum failed login attempts
 async def test_account_lock_after_failed_logins(db_session, verified_user):
     max_login_attempts = get_settings().max_login_attempts
-    for _ in range(max_login_attempts):
+    for _ in range(max_login_attempts): 
         await UserService.login_user(db_session, verified_user.email, "wrongpassword")
     
     is_locked = await UserService.is_account_locked(db_session, verified_user.email)
@@ -172,13 +176,34 @@ def mock_minio_client():
         mock_client.put_object.return_value = None
         yield mock_client
 
-# # tests/test_user_routes.py
+# async def test_update_user_valid_data(db_session, user):
+#     new_email = "updated_email@example.com"
+#     updated_user = await UserService.update(db_session, user.id, {"email": new_email})
+#     assert updated_user is not None
+#     assert updated_user.email == new_email
 
-# from fastapi.testclient import TestClient
-# from app.main import app
+@pytest.mark.asyncio
+async def test_update_profile_picture(db_session, user, monkeypatch):
+    # Arrange
+    mock_db = MagicMock()
+    mock_db.commit = AsyncMock()
+    mock_db.refresh = AsyncMock()
 
-# client = TestClient(app)
+    # fake_user = User(id=uuid4(), username="testuser", profile_picture_url=None)
+    mock_get_by_id = AsyncMock(return_value=user)
 
-# def test_user_create():
-#     response = client.post("/users/", json={"username": "testuser", "email": "test@example.com"})
-#     assert response.status_code == 200 or response.status_code == 201
+    monkeypatch.setattr(UserService, "get_by_id", mock_get_by_id)
+
+    new_picture_url = "http://example.com/pic.jpg"
+
+    # Act
+    updated_user = await UserService.update_profile_picture(
+        mock_db, user.id, new_picture_url
+    )
+
+    # Assert
+    mock_get_by_id.assert_called_once_with(mock_db, user.id)
+    mock_db.commit.assert_awaited_once()
+    mock_db.refresh.assert_awaited_once_with(user)
+    assert updated_user.profile_picture_url == new_picture_url
+
