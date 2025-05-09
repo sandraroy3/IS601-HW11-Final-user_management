@@ -35,7 +35,7 @@ from app.dependencies import get_settings
 from app.services.email_service import EmailService
 from fastapi import File, UploadFile
 from app.services.minio_service import upload_profile_picture_to_minio
-from app.services.user_service import update_profile_picture
+from app.services.user_service import UserService
 # from minio import Minio
 
 router = APIRouter()
@@ -243,9 +243,9 @@ async def verify_email(user_id: UUID, token: str, db: AsyncSession = Depends(get
 from app.models.user_model import User
 from app.schemas.user_schemas import UserResponse
 
-@router.post("/users/{user_id}/upload-profile-picture", response_model=UserResponse, name="upload_profile_picture", tags=["User Management Requires (Admin or Manager Roles)"])
+@router.post("/users/{user_id}/upload-profile-picture", response_model=UserResponse, name="upload_profile_picture", tags=["Upload Images (Admin or Manager or Authenticated Roles)"])
 async def upload_profile_picture_to_minio(file: UploadFile, user_id: UUID, db: AsyncSession = Depends(get_db)) -> UserResponse:
-    
+        
     bucket_name = get_settings().minio_bucket_name
     object_name = f"{user_id}/{file.filename}"
     content_type = file.content_type
@@ -267,7 +267,7 @@ async def upload_profile_picture_to_minio(file: UploadFile, user_id: UUID, db: A
     )
 
     # Update user with new picture URL in DB
-    updated_user = await update_profile_picture(db, user_id, picture_url=f"https://{get_settings().minio_endpoint}/{bucket_name}/{object_name}")
+    updated_user = await UserService.update_profile_picture(db, user_id, picture_url=f"https://{get_settings().minio_endpoint}/{bucket_name}/{object_name}")
 
     # If updated_user is an ORM model, convert it to Pydantic model (UserResponse)
     return UserResponse.from_orm(updated_user)
