@@ -171,3 +171,14 @@ def mock_minio_client():
         mock_client.bucket_exists.return_value = True
         mock_client.put_object.return_value = None
         yield mock_client
+
+# # tests/test_user_routes.py
+
+# from fastapi.testclient import TestClient
+# from app.main import app
+
+# client = TestClient(app)
+
+# def test_user_create():
+#     response = client.post("/users/", json={"username": "testuser", "email": "test@example.com"})
+#     assert response.status_code == 200 or response.status_code == 201

@@ -16,7 +16,7 @@ Fixtures:
 # Standard library imports
 from builtins import Exception, range, str
 from datetime import timedelta
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, patch, MagicMock
 from uuid import uuid4
 
 # Third-party imports
@@ -238,20 +238,13 @@ def email_service():
         mock_service.send_verification_email.return_value = None
         mock_service.send_user_email.return_value = None
         return mock_service
-
-from unittest.mock import MagicMock, patch
-
-@pytest.fixture(autouse=True)
+    
+# Automatically patch minio_client when tests run
+@pytest.fixture(autouse=True, scope="session")
 def mock_minio_client():
     with patch("app.routers.user_routes.minio_client") as mock_client:
         mock_client.bucket_exists.return_value = True
+        mock_client.make_bucket.return_value = None
         mock_client.put_object.return_value = None
-        yield mock_client
-import pytest
-from unittest.mock import MagicMock, patch
-
-@pytest.fixture(scope="session", autouse=True)
-def mock_minio():
-    with patch("app.routers.user_routes.minio_client") as mock_client:
-        mock_client.bucket_exists.return_value = True
+        mock_client.get_object.return_value = MagicMock()
         yield mock_client
