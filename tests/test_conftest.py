@@ -62,3 +62,9 @@ async def test_update_professional_status(db_session, verified_user):
     updated_user = result.scalars().first()
     assert updated_user.is_professional
     assert updated_user.professional_status_updated_at is not None
+
+# import os
+# from app.services.email_service import EmailService
+
+def test_email_service_mock(email_service):
+    assert hasattr(email_service, "send_verification_email")
