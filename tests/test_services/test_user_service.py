@@ -3,7 +3,7 @@ import pytest
 from sqlalchemy import select
 from app.dependencies import get_settings
 from app.models.user_model import User, UserRole
-from app.services.user_service import UserService
+from app.services.user_service import UserService, update_profile_picture
 from app.utils.nickname_gen import generate_nickname
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
@@ -197,7 +197,7 @@ async def test_update_profile_picture(db_session, user, monkeypatch):
     new_picture_url = "http://example.com/pic.jpg"
 
     # Act
-    updated_user = await UserService.update_profile_picture(
+    updated_user = await update_profile_picture(
         mock_db, user.id, new_picture_url
     )
 
