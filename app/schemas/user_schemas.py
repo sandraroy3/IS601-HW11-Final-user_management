@@ -1,5 +1,5 @@
 from builtins import ValueError, any, bool, str
-from pydantic import BaseModel, EmailStr, Field, validator, root_validator
+from pydantic import BaseModel, EmailStr, Field, validator, root_validator, HttpUrl
 from typing import Optional, List
 from datetime import datetime
 from enum import Enum
@@ -81,3 +81,16 @@ class UserListResponse(BaseModel):
     total: int = Field(..., example=100)
     page: int = Field(..., example=1)
     size: int = Field(..., example=10)
+
+class UploadProfilePictureResponse(BaseModel):
+    url: HttpUrl
+
+class UserResponse(UserBase):
+    id: uuid.UUID = Field(..., example=uuid.uuid4())
+    email: EmailStr = Field(..., example="john.doe@example.com")
+    nickname: Optional[str] = Field(None, min_length=3, pattern=r'^[\w-]+$', example=generate_nickname())    
+    is_professional: Optional[bool] = Field(default=False, example=True)
+    role: UserRole
+
+    class Config:
+        orm_mode = True  # Allow conversion from ORM models to Pydantic models

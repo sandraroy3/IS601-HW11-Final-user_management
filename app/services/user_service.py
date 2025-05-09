@@ -1,3 +1,4 @@
+
 from builtins import Exception, bool, classmethod, int, str
 from datetime import datetime, timezone
 import secrets
@@ -201,3 +202,13 @@ class UserService:
             await session.commit()
             return True
         return False
+
+@staticmethod
+async def update_profile_picture(db: AsyncSession, user_id: UUID, picture_url: str):
+    user = await UserService.get_by_id(db, user_id)
+    if not user:
+        return None
+    user.profile_picture_url = picture_url
+    await db.commit()
+    await db.refresh(user)
+    return user
